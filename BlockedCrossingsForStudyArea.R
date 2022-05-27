@@ -1,0 +1,41 @@
+library(tidyverse)
+library(httr)
+library(sf)
+library(tmap)
+library(tigris)
+tmap_mode("view")
+
+basemap <- tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) + tm_tiles("OpenRailwayMap", alpha = 0.5)
+
+
+
+# Download FRA Data for Blocked Crossing Reports --------------------------
+
+# The API link below may need to be updated. To do that, go to: https://www.fra.dot.gov/blockedcrossings/incidents
+# Press CTRL + SHIFT + I to open devtools. Go to the Network tab, make sure Fetch/XHR is clicked and refresh the page
+# The Request URL that shows up is what you could use for the URL below. 
+dataRaw <- 
+  GET("https://www.fra.dot.gov/blockedcrossings/api/incidents?page=1&pageSize=500000") %>% 
+  content()
+blockedCrossings <- dataRaw$items %>% bind_rows() %>% rename(CrossingID = crossingID)
+
+
+
+# Import Grade Crossing Inventory Data ------------------------------------
+
+# Read in all Current US crossing data
+# Note that this file is too large to be stored on github. 
+# Download "All States" file from: https://safetydata.fra.dot.gov/OfficeofSafety/publicsite/DownloadCrossingInventoryData.aspx 
+
+xings <- 
+  read_csv("C:/Users/frryan/Desktop/_Working Files/_R/FRA/CurrentInventory/PublishedCrossingData-04-30-2022.csv",
+           col_types = cols(
+             MilePost = col_double())) %>%
+  filter(
+    !is.na(Latitude), #filter xings without lat/long
+    PosXing == 1, #filter only at-grade xings
+    ReasonID != 16 #filter xings that have been closed
+  ) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) 
+
+# Next step is to filter to the study area 

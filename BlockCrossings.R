@@ -7,11 +7,17 @@ tmap_mode("view")
 
 basemap <- tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) + tm_tiles("OpenRailwayMap", alpha = 0.5)
 
+# The API link below may need to be updated. To do that, go to: https://www.fra.dot.gov/blockedcrossings/incidents
+# Press CTRL + SHIFT + I to open devtools. Go to the Network tab, make sure Fetch/XHR is clicked and refresh the page
+# THe Request URL that shows up is what you could use for the URL below. 
 dataRaw <- 
   GET("https://www.fra.dot.gov/blockedcrossings/api/incidents?page=1&pageSize=500000") %>% 
-  content() %>% bind_rows() %>%
+  content()# %>% bind_rows() %>%
   rename(CrossingID = crossingID)
 
+dataRaw$items %>% bind_rows() #[2]
+
+  
 xings <- 
   read_csv("CurrentInventory/PublishedCrossingData-01-31-2022.csv") %>%
   filter(
