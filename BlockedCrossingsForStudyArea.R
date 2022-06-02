@@ -3,11 +3,13 @@ library(httr)
 library(sf)
 library(tmap)
 library(tigris)
+library(raster)
 tmap_mode("view")
 
+#proj <- 26916
+proj <- 4326
+
 basemap <- tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) + tm_tiles("OpenRailwayMap", alpha = 0.5)
-
-
 
 # Download FRA Data for Blocked Crossing Reports --------------------------
 
@@ -19,8 +21,6 @@ dataRaw <-
   content()
 blockedCrossings <- dataRaw$items %>% bind_rows() %>% rename(CrossingID = crossingID)
 
-
-
 # Import Grade Crossing Inventory Data ------------------------------------
 
 # Read in all Current US crossing data
@@ -28,8 +28,9 @@ blockedCrossings <- dataRaw$items %>% bind_rows() %>% rename(CrossingID = crossi
 # Download "All States" file from: https://safetydata.fra.dot.gov/OfficeofSafety/publicsite/DownloadCrossingInventoryData.aspx 
 
 xings <- 
-  read_csv("C:/Users/frryan/Desktop/_Working Files/_R/FRA/CurrentInventory/PublishedCrossingData-04-30-2022.csv",
-           col_types = cols(
+#  read_csv("C:/Users/frryan/Desktop/_Working Files/_R/FRA/CurrentInventory/PublishedCrossingData-04-30-2022.csv", #Chris
+  read_csv("C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Data/GCIS_Published_Crossing_Data/PublishedCrossingData-05-31-2022.csv", #Steph
+        col_types = cols(
              MilePost = col_double())) %>%
   filter(
     !is.na(Latitude), #filter xings without lat/long
@@ -50,6 +51,9 @@ gcisAccHist <- map_dfr(
 )
 
 
+# Next step is to filter to the study area
+MACOGSF <- read_sf("C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Data/Indiana Counties/d97376b1-781d-4aad-bacc-011171010eee2020413-1-1wbeqv7.muvgf.shp") %>% 
+  filter(COUNTYNAME == "ELKHART" | COUNTYNAME == "KOSCIUSKO" | COUNTYNAME == "MARSHALL" | COUNTYNAME == "ST. JOSEPH") %>%
+  st_transform(proj)
 
 
-# Next step is to filter to the study area 
