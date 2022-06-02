@@ -9,7 +9,7 @@ basemap <- tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldI
 
 # The API link below may need to be updated. To do that, go to: https://www.fra.dot.gov/blockedcrossings/incidents
 # Press CTRL + SHIFT + I to open devtools. Go to the Network tab, make sure Fetch/XHR is clicked and refresh the page
-# THe Request URL that shows up is what you could use for the URL below. 
+# The Request URL that shows up is what you could use for the URL below. 
 dataRaw <- 
   GET("https://www.fra.dot.gov/blockedcrossings/api/incidents?page=1&pageSize=500000") %>% 
   content()# %>% bind_rows() %>%
