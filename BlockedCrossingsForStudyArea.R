@@ -4,6 +4,7 @@ library(sf)
 library(tmap)
 library(tigris)
 library(raster)
+library(dplyr)
 tmap_mode("view")
 
 #proj <- 26916
@@ -37,6 +38,19 @@ xings <-
     PosXing == 1, #filter only at-grade xings
     ReasonID != 16 #filter xings that have been closed
   ) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+
+GradeSepxings <- 
+  #  read_csv("C:/Users/frryan/Desktop/_Working Files/_R/FRA/CurrentInventory/PublishedCrossingData-04-30-2022.csv", #Chris
+  read_csv("C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Data/GCIS_Published_Crossing_Data/PublishedCrossingData-05-31-2022.csv", #Steph
+           col_types = cols(
+             MilePost = col_double())) %>%
+  filter(
+    !is.na(Latitude), #filter xings without lat/long
+    PosXing != 1, #filter only at-grade xings
+    ReasonID != 16 #filter xings that have been closed
+  ) %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) 
 
 # Import FRA Accident/Incident Records ------------------------------------
@@ -55,15 +69,30 @@ MACOGSF <- read_sf("C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing 
   filter(COUNTYNAME == "ELKHART" | COUNTYNAME == "KOSCIUSKO" | COUNTYNAME == "MARSHALL" | COUNTYNAME == "ST. JOSEPH") %>%
   st_transform(proj)
 
+
 # Filter for MACOG data
 MACOG_xings <- xings %>% st_intersection(MACOGSF)
 MACOG_xingaccs <- gcisAccHist %>% filter(COUNTY == "ELKHART" | COUNTY == "KOSCIUSKO" | COUNTY == "MARSHALL" | COUNTY == "ST. JOSEPH")
 IN_blockedxings <- blockedCrossings %>% filter(state == "IN")
-
+MACOG_GradeSepxings <- GradeSepxings %>% st_intersection(MACOGSF)
 
 #Joining Grade Crossing Inventory with Blocked Crossings Report
 MACOG_xingsblocked <- inner_join(MACOG_xings, IN_blockedxings, by = "CrossingID")
-write_csv(MACOG_xingsblocked, "MACOG Blocked Crossings.csv")
+#write_csv(MACOG_xingsblocked, "MACOG Blocked Crossings.csv")
+
+# Grouping by and adding the number of times crossing was blocked
+MACOG_xingsblockedCount <- as.data.frame(table(MACOG_xingsblocked$CrossingID))
+colnames(MACOG_xingsblockedCount) <- c('CrossingID', 'Count')
+
+MACOG_xingsblockedSummary <- MACOG_xingsblocked %>%
+  mutate(long = unlist(map(MACOG_xingsblocked$geometry, 1)),
+         lat = unlist(map(MACOG_xingsblocked$geometry, 2))) %>%
+  st_drop_geometry() %>%
+  left_join(MACOG_xingsblockedCount, by = "CrossingID") %>%
+  group_by(CrossingID, Railroad, CityName, CountyName, Count, long, lat) %>%
+  summarize() %>%
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
+
 
 # Import Rail Lines Data (SKIP IF DONE ALREADY) ---------------------------------------------------------------
 # https://geo.dot.gov/server/rest/services/NTAD/North_American_Rail_Lines/MapServer/0
@@ -81,10 +110,18 @@ railLinesMACOG <- railLines %>% st_transform(proj) %>% st_intersection(MACOGSF) 
 
 RailLinesBlockedXings <-
   tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(railLinesMACOG) + tm_lines(lwd = 4, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set1", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(MACOG_xingsblocked) + tm_dots(size = 0.02, col = "grey30", id = "reason", popup.vars = c("CrossingID", "railroad", "reason", "CityName", "CountyName", "dateTime", "duration")) +
-  tm_shape(MACOGSF) + tm_borders() +
-  tm_add_legend(type = "fill", labels = "Blocked Grade Crossing", col = "grey30")
+  tm_shape(railLinesMACOG) +
+      tm_lines(lwd = 4, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set1", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_xingsblockedSummary) +
+      tm_dots(size = "Count", scale = 2, alpha = 0.5, col = "grey30", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, legend.size.is.portrait = TRUE) +
+      tm_add_legend(type = "fill", labels = "Frequency of Blocked Grade Crossing", col = "grey30") +
+  tm_shape(MACOG_xings) +
+      tm_dots(col = "darkorange2", popup.vars = FALSE, size = 0.01) +
+  tm_shape(MACOG_GradeSepxings) +
+      tm_dots(col = "chartreuse3", popup.vars = FALSE, size = 0.01) +
+  tm_shape(MACOGSF) + tm_borders()
+
+
 tmap_save(RailLinesBlockedXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/MACOG Blocked Grade Crossings.html")
 
 
