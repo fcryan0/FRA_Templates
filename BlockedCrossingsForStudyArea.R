@@ -68,11 +68,11 @@ gcisAccHist <- map_dfr(
 MACOGSF <- read_sf("C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Data/Indiana Counties/d97376b1-781d-4aad-bacc-011171010eee2020413-1-1wbeqv7.muvgf.shp") %>% 
   filter(COUNTYNAME == "ELKHART" | COUNTYNAME == "KOSCIUSKO" | COUNTYNAME == "MARSHALL" | COUNTYNAME == "ST. JOSEPH") %>%
   st_transform(proj)
-
+MACOGcounties <- c("ELKHART", "KOSCIUSKO", "MARSHALL", "ST. JOSEPH")
 
 # Filter for MACOG data
 MACOG_xings <- xings %>% st_intersection(MACOGSF)
-MACOG_xingaccs <- gcisAccHist %>% filter(COUNTY == "ELKHART" | COUNTY == "KOSCIUSKO" | COUNTY == "MARSHALL" | COUNTY == "ST. JOSEPH")
+MACOG_xingaccs <- gcisAccHist %>% filter(COUNTY %in% MACOGcounties)
 IN_blockedxings <- blockedCrossings %>% filter(state == "IN")
 MACOG_GradeSepxings <- GradeSepxings %>% st_intersection(MACOGSF)
 
@@ -114,13 +114,12 @@ RailLinesBlockedXings <-
       tm_lines(lwd = 4, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set1", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xingsblockedSummary) +
       tm_dots(size = "Count", scale = 2, alpha = 0.5, col = "grey30", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, legend.size.is.portrait = TRUE) +
-      tm_add_legend(type = "fill", labels = "Frequency of Blocked Grade Crossing", col = "grey30") +
+      tm_add_legend(type = "fill", labels = "Frequency of Grade Crossing Blockages", col = "grey30") +
   tm_shape(MACOG_xings) +
       tm_dots(col = "darkorange2", popup.vars = FALSE, size = 0.01) +
   tm_shape(MACOG_GradeSepxings) +
       tm_dots(col = "chartreuse3", popup.vars = FALSE, size = 0.01) +
   tm_shape(MACOGSF) + tm_borders()
-
 
 tmap_save(RailLinesBlockedXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/MACOG Blocked Grade Crossings.html")
 
