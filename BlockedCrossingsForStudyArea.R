@@ -38,6 +38,7 @@ xings <-
     PosXing == 1, #filter only at-grade xings
     ReasonID != 16 #filter xings that have been closed
   ) %>%
+  mutate(CrossingType = "At-Grade") %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
 
 
@@ -51,7 +52,11 @@ GradeSepxings <-
     PosXing != 1, #filter only at-grade xings
     ReasonID != 16 #filter xings that have been closed
   ) %>%
-  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) 
+  mutate(CrossingType = "Grade-Separated") %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+allXings <- rbind(xings, GradeSepxings)
+
 
 # Import FRA Accident/Incident Records ------------------------------------
 
@@ -90,7 +95,7 @@ MACOGcounties <- c("ELKHART", "KOSCIUSKO", "MARSHALL", "ST. JOSEPH")
 MACOG_xings <- xings %>% st_intersection(MACOGSF)
 MACOG_xingaccs <- gcisAccHist %>% filter(COUNTY %in% MACOGcounties)
 IN_blockedxings <- blockedCrossings %>% filter(state == "IN")
-MACOG_GradeSepxings <- GradeSepxings %>% st_intersection(MACOGSF)
+MACOG_allXings <- allXings %>% st_intersection(MACOGSF)
 railLinesMACOG <- railLines %>% st_intersection(MACOGSF)
 railYardsMACOG <- railYards %>% st_intersection(MACOGSF)
 
@@ -111,20 +116,27 @@ MACOG_xingsblockedSummary <- MACOG_xingsblocked %>%
   summarize() %>%
   st_as_sf(coords = c("long", "lat"), crs = 4326)
 
+# Just renaming for tmap view mode purposes
+Rail_Lines <- railLinesMACOG
+Rail_Yards <- railYardsMACOG
+Blocked_Crossings <- MACOG_xingsblockedSummary %>% mutate(NumberofCrossingBlockages = Count)
+Grade_Crossings <- MACOG_allXings
+MACOG_Boundary <- MACOGSF
+
 RailLinesBlockedXings <-
   tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(railLinesMACOG) +
-      tm_lines(lwd = 4, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set1", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(MACOG_xingsblockedSummary) +
-      tm_dots(size = "Count", scale = 2, alpha = 0.5, col = "grey30", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, legend.size.is.portrait = TRUE) +
-      tm_add_legend(type = "fill", labels = "Frequency of Grade Crossing Blockages", col = "grey30") +
-  tm_shape(MACOG_xings) +
-      tm_dots(col = "darkorange2", popup.vars = FALSE, size = 0.01) +
-  tm_shape(MACOG_GradeSepxings) +
-      tm_dots(col = "chartreuse3", popup.vars = FALSE, size = 0.01) +
-  tm_shape(MACOGSF) + tm_borders()
+  tm_shape(Rail_Lines) +
+      tm_lines(lwd = 5, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(Rail_Yards) +
+      tm_lines(lwd = 10, col = "black", id = "RROWNER1", popup.vars = FALSE, title.col = "Rail Yards") +
+      tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
+      tm_add_legend(type = "fill", labels = "Rail Yards", col = "black") +
+  tm_shape(Blocked_Crossings) +
+      tm_dots(col = "NumberofCrossingBlockages", size = "NumberofCrossingBlockages", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title.size = "Number of Grade Crossing Blockages") +
+  tm_shape(Grade_Crossings) +
+      tm_dots(col = "CrossingType", palette = "RdBu", alpha = 0.75, popup.vars = FALSE, size = 0.01) +
+  tm_shape(MACOG_Boundary) + tm_borders()
 
 tmap_save(RailLinesBlockedXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/MACOG Blocked Grade Crossings.html")
-
 
 
