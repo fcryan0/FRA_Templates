@@ -5,7 +5,8 @@ library(tmap)
 library(tigris)
 library(raster)
 library(dplyr)
-library(units)
+library(sp)
+library(rgeos)
 tmap_mode("view")
 
 #proj <- 26916
@@ -260,8 +261,14 @@ tmap_save(AllWeeklySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACO
 ###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## Crossing in Proximity to Named Rail Yard
 MACOG_xings_close2Yard <- MACOG_xings %>%
-  mutate(dist2Yard = as.numeric(st_distance(., MACOG_railYards) / 1609.34)) %>%
-  filter(dist2Yard < 1)
+  mutate(dist2Yard = gDistance(., MACOG_railYards, byid = TRUE)
+  )
+  
+  
+  
+  
+  #mutate(dist2Yard = as.numeric(st_distance(., MACOG_railYards) / 1609.34)) %>%
+  #filter(dist2Yard < 1)
 
 
   
