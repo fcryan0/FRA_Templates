@@ -178,6 +178,107 @@ MACOG_RailCrossingIncidents_shp <- MACOG_xingaccs %>%
 
 
 ###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## Crossing with HIGH SWTICHING TRAIN VOLUMES and HIGH WEEKLY TRAIN VOLUMES
+# Summarize number of crossings by number of switching trains per day
+MACOG_xings_SwtCount <- as.data.frame(table(MACOG_xings$TotalSwt))
+colnames(MACOG_xings_SwtCount) <- c('TotalSwt', 'NumbofCrossings')
+
+# Check for 90th percentile
+quantile(MACOG_xings$TotalSwt, 0.99) #6
+
+# Filter for top 1% in number of switching trains
+MACOG_xings_highSwt <- MACOG_xings %>%
+  filter(TotalSwt > 6) %>%
+  mutate(TotalSwt2 = as.character(TotalSwt))
+
+# High Switching Train Volumes Crossings Map
+HighDailySwitchingTrains <-
+tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
+  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(Rail_Lines) +
+  tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_xings_highSwt) +
+  tm_dots(col = "TotalSwt2", palette = "Dark2", alpha = 1, popup.vars = FALSE, size = 0.1, title = "Average Number of Switching Trains Per Day")
+tmap_save(HighDailySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/HighDailySwitchingTrains.html")
+
+
+# CrossingID = 522576V has the highest number of total switching trains (13 per day).
+# This crossing is located on the NS line near New Carlisle near the Northwestern border of St. Joseph County.
+# CrossingID = 533572Y has the second highest number of total switching trains (9 per day).
+# This crossing is located on the NS line in Warsaw.
+# CrossingID = 533573F has the tird highest number of total switching trains (7 per day).
+# This crossing is located on the NS line in Warsaw as well.
+
+
+# All Crossings according to number of switching trains per day
+AllDailySwitchingTrains <-
+tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
+  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(Rail_Lines) +
+  tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_xings) +
+  tm_dots(col = "TotalSwt", size = "TotalSwt", scale = 0.5, alpha = 0.5, palette = "YlOrBr", id = "TotalSwt", popup.vars = FALSE, title = "Average Number of Switching Trains Per Day")
+tmap_save(AllDailySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/AllDailySwitchingTrains.html")
+
+# I DON'T LIKE THIS IT SEEMS INACCURATE (?)
+# All Crossings according to number of  trains per week
+# Note: this attribute is not available for all rail lines, hence missing info for some locations
+AllWeeklySwitchingTrains <-
+tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
+  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(Rail_Lines) +
+  tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_xings) +
+  tm_dots(col = "WeekTrnMov", size = "WeekTrnMov", scale = 0.75, alpha = 0.5, palette = "YlOrBr", id = "WeekTrnMov", title = "Weekly Average Number of Trains")
+tmap_save(AllWeeklySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/AllWeeklySwitchingTrains.html")
+
+# CrossingID = 934674A has the highest weekly number of trains (5 per week for the available data).
+# This crossing is located at the border of the two South-most counties.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## SPEEDS AND VOLUMES
 # Crosswalk table between operating RR and RR Owner
 railNameLookup <- tibble(
@@ -234,34 +335,4 @@ MACOG_railLines_SpdVol <- MACOG_railLines_Join1 %>% left_join(missingDataJoin, b
       TRUE ~ speed
     )
   )
-
-
-###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-## Crossing with HIGH SWTICHING TRAIN VOLUMES and HIGH WEEKLY TRAIN VOLUMES
-# Summarize number of crossings by number of switching trains per day
-MACOG_xings_SwtCount <- as.data.frame(table(MACOG_xings$TotalSwt))
-colnames(MACOG_xings_SwtCount) <- c('TotalSwt', 'NumbofCrossings')
-
-# Check for 90th percentile
-quantile(MACOG_xings$TotalSwt, 0.99) #6
-
-# Filter for top 1% in number of switching trains
-MACOG_xings_highSwt <- MACOG_xings %>%
-  filter(TotalSwt > 6) %>%
-  mutate(TotalSwt2 = as.character(TotalSwt))
-
-tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
-  tm_shape(Rail_Lines) +
-  tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(MACOG_xings_highSwt) +
-  tm_dots(col = "TotalSwt2", palette = "Dark2", alpha = 1, popup.vars = FALSE, size = 0.01, title = "Number of Switching Trains")
-
-# CrossingID = 522576V has the highest number of total switching trains (13 per day).
-# This crossing is located on the NS line near New Carlisle near the Northwestern border of St. Joseph County.
-# CrossingID = 533572Y has the second highest number of total switching trains (9 per day).
-# This crossing is located on the NS line in Warsaw.
-# CrossingID = 533573F has the tird highest number of total switching trains (7 per day).
-# This crossing is located on the NS line in Warsaw as well.
-
 
