@@ -94,8 +94,8 @@ MACOGcounties <- c("ELKHART", "KOSCIUSKO", "MARSHALL", "ST. JOSEPH")
 MACOG_xings <- xings %>% st_intersection(MACOGSF)
 IN_blockedxings <- blockedCrossings %>% filter(state == "IN")
 MACOG_allXings <- allXings %>% st_intersection(MACOGSF)
-railLinesMACOG <- railLines %>% st_intersection(MACOGSF)
-railYardsMACOG <- railYards %>% st_intersection(MACOGSF)
+MACOG_railLines <- railLines %>% st_intersection(MACOGSF)
+MACOG_railYards <- railYards %>% st_intersection(MACOGSF)
 MACOG_xingaccs <- gcisAccHist %>% filter(COUNTY %in% MACOGcounties, STATE == "18")  %>%
   filter(
     GXID != "916991G", # closed crossing since November 2019
@@ -126,23 +126,23 @@ MACOG_xingsblockedSummary <- MACOG_xingsblocked %>%
 # Just renaming for tmap view mode purposes
 Rail_Lines <- railLinesMACOG
 Rail_Yards <- railYardsMACOG
-Blocked_Crossings <- MACOG_xingsblockedSummary %>% mutate(NumberofCrossingBlockageComplaints = Count)
+Blocked_Crossings <- MACOG_xingsblockedSummary %>% mutate(BlockedCrossingReports = Count)
 Grade_Crossings <- MACOG_allXings
 MACOG_Boundary <- MACOGSF
 
 RailLinesBlockedXings <-
   tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(Rail_Lines) +
-      tm_lines(lwd = 5, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_Boundary) + tm_borders() +
   tm_shape(Rail_Yards) +
       tm_lines(lwd = 10, col = "black", id = "RROWNER1", popup.vars = FALSE, title.col = "Rail Yards") +
-      tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
+      #tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
       tm_add_legend(type = "fill", labels = "Rail Yards", col = "black") +
   tm_shape(Blocked_Crossings) +
-      tm_dots(col = "NumberofCrossingBlockageComplaints", size = "NumberofCrossingBlockageComplaints", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title.size = "Number of Grade Crossing Blockages") +
+      tm_dots(col = "BlockedCrossingReports", size = "BlockedCrossingReports", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title = "Blocked Crossing Reports") +
+  tm_shape(Rail_Lines) +
+      tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(Grade_Crossings) +
-      tm_dots(col = "CrossingType", palette = "RdBu", alpha = 0.75, popup.vars = FALSE, size = 0.01) +
-  tm_shape(MACOG_Boundary) + tm_borders()
+      tm_dots(col = "CrossingType", palette = "RdBu", alpha = 0.75, popup.vars = FALSE, size = 0.01, title = "Crossing Type")
 
 tmap_save(RailLinesBlockedXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/MACOG Blocked Crossings.html")
 write_csv(Blocked_Crossings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Results/Blocked Crossings Recorded Complaints.csv")
@@ -175,4 +175,77 @@ MACOG_RailCrossingIncidents_shp <- MACOG_xingaccs %>%
                      lat = unlist(map(MACOG_xings$geometry, 2))),
             by = "CrossingID") %>%
   st_as_sf(coords = c("long", "lat"), crs = 4326)
+
+
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## SPEEDS AND VOLUMES
+# Crosswalk table between operating RR and RR Owner
+railNameLookup <- tibble(
+  CrossingIdSuffix = c("CFE", "CN", "CSS", "CSX", "ELWX", "GDLK", "GER", "GTW", "NICD", "NS"),
+  RRname           = c("CFE", "CN", "CSS", "CSX","EWR", "GDLK", "GDLK", "CN",  "NICTD", "NS"))
+
+# Add RR names and calculate daily train volumes (doesn't include switching)
+MACOG_xings2 <- MACOG_xings %>% left_join(railNameLookup) %>% mutate(trainTot = DayThru + NghtThru)
+
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+# Join crossing data to rail line data to calculate train speed and volumes
+railJoin <- st_join(MACOG_xings2, MACOG_railLines, join = st_nearest_feature) %>% st_drop_geometry() %>%
+  dplyr::select(OBJECTID = OBJECTID.y, RROWNER1, trainTot, MaxTtSpd) %>% group_by(OBJECTID) %>% 
+  summarize(
+    trains = getmode(trainTot),
+    speed = getmode(MaxTtSpd)
+  )
+
+# Add the speed and volume information to the rail line data for mainlines only
+# Then split it and join the unknown data to the known data and recombine
+MACOG_railLines_Join1 <- MACOG_railLines %>%
+  left_join(railJoin) %>%
+  filter(NET %in% c("M")) %>%
+  dplyr::select(OBJECTID, COUNTYNAME, RROWNER1, trains, speed)
+railJoinKnown <- MACOG_railLines_Join1 %>% filter(!is.na(trains))
+railJoinEmpty <- MACOG_railLines_Join1 %>% filter(is.na(trains))
+
+missingDataJoin <- st_join(railJoinEmpty, railJoinKnown, join = st_nearest_feature) %>% 
+  dplyr::select(OBJECTID = OBJECTID.x, COUNTYNAME = COUNTYNAME.x, RROWNER = RROWNER1.x, trains = trains.y, speed = speed.y) %>% st_drop_geometry()
+
+# Manually adjusting train volumes on NS line // FRA supposed inaccurate data
+MACOG_railLines_SpdVol <- MACOG_railLines_Join1 %>% left_join(missingDataJoin, by = "OBJECTID") %>%
+  rowwise() %>%
+  transmute(
+    OBJECTID = OBJECTID,
+    COUNTYNAME = COUNTYNAME.x,
+    RROWNER1 = RROWNER1,
+    trains = max(trains.x, trains.y, na.rm = TRUE),
+    speed = max(speed.x, speed.y, na.rm = TRUE)
+  ) %>%
+  mutate(
+    new_trains = case_when(
+      (COUNTYNAME == "ST. JOSEPH" & RROWNER1 == "NS" & trains < 20) ~ 60,
+      (COUNTYNAME == "ELKHART" & RROWNER1 == "NS" & trains < 5) ~ 60,
+      TRUE ~ trains
+    ),
+    new_speed = case_when(
+      (COUNTYNAME == "ST. JOSEPH" & RROWNER1 == "NS" & trains < 20) ~ 79,
+      (COUNTYNAME == "ELKHART" & RROWNER1 == "NS" & trains < 5) ~ 79,
+      TRUE ~ speed
+    )
+  )
+
+
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## CROSSINGS WITH HIGH SWTICHING TRAIN VOLUMES
+MACOG_xings %>% mean(TotalSwt)
+
+
+
+
+
+
+
+
+
 
