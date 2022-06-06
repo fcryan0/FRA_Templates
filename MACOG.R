@@ -5,6 +5,7 @@ library(tmap)
 library(tigris)
 library(raster)
 library(dplyr)
+library(units)
 tmap_mode("view")
 
 #proj <- 26916
@@ -150,7 +151,7 @@ write_csv(Blocked_Crossings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade
 
 ###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## CROSSING CRASHES (LAST 5 YEARS)
-# Processing 5-year Crossing Incident Data
+# Summarize crashes for past 5 years by severity and GXID
 MACOG_xingaccs5yr <- MACOG_xingaccs %>%
   mutate(CrashYear = 2000 + as.numeric(YEAR)) %>%
   #filter(CrashYear >= 2016) %>% 
@@ -164,9 +165,18 @@ MACOG_xingaccs5yr <- MACOG_xingaccs %>%
   pivot_wider(names_from = "severity", values_from = "count", values_fill = 0) %>%
   mutate(Total5yr = sum(c_across(Injury:Fatal)))
 
+# The following three crossings have had more than 1 injury/fatal accident in the past 5 years.
+MACOG_xingaccs5yr %>% filter(Total5yr >1)
+# GXID = 510034C
+# GXID = 522506F
+# GXID = 533573F
+
 # Joining 5-year Crossing Incident Data to FRA Crossing Inventory Data
 MACOG_RailCrossingIncidents <- MACOG_xingaccs %>%
   inner_join(MACOG_xingaccs5yr, by = c("CrossingID" = "GXID"))
+
+MACOG_RailCrossingIncidents %>% ggplot(aes(x = YEAR)) + geom_histogram(stat = "count")
+plotly::ggplotly()
 
 MACOG_RailCrossingIncidents_shp <- MACOG_xingaccs %>%
   inner_join(MACOG_xingaccs5yr, by = c("CrossingID" = "GXID")) %>%
@@ -176,6 +186,17 @@ MACOG_RailCrossingIncidents_shp <- MACOG_xingaccs %>%
             by = "CrossingID") %>%
   st_as_sf(coords = c("long", "lat"), crs = 4326)
 
+# Rail Incidents Map
+RailIncidents <-
+tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
+  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(Rail_Lines) +
+    tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+  tm_shape(MACOG_RailCrossingIncidents_shp) +
+    tm_dots(col = "darkorange3", popup.vars = TRUE, size = 0.03) +
+  tm_shape(MACOG_RailCrossingIncidents_shp %>% filter(Fatal > 0)) +
+    tm_dots(col = "firebrick3", size = 0.05)
+ 
 
 ###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## Crossing with HIGH SWTICHING TRAIN VOLUMES and HIGH WEEKLY TRAIN VOLUMES
@@ -236,6 +257,16 @@ tmap_save(AllWeeklySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACO
 # This crossing is located at the border of the two South-most counties.
 
 
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## Crossing in Proximity to Named Rail Yard
+MACOG_xings_close2Yard <- MACOG_xings %>%
+  mutate(dist2Yard = as.numeric(st_distance(., MACOG_railYards) / 1609.34)) %>%
+  filter(dist2Yard < 1)
+
+
+  
+  
+  
 
 
 
