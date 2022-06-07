@@ -125,25 +125,18 @@ MACOG_xingsblockedSummary <- MACOG_xingsblocked %>%
   summarize() %>%
   st_as_sf(coords = c("long", "lat"), crs = 4326)
 
-# Just renaming for tmap view mode purposes
-Rail_Lines <- railLinesMACOG
-Rail_Yards <- railYardsMACOG
-Blocked_Crossings <- MACOG_xingsblockedSummary %>% mutate(BlockedCrossingReports = Count)
-Grade_Crossings <- MACOG_allXings
-MACOG_Boundary <- MACOGSF
-
 RailLinesBlockedXings <-
   tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
-  tm_shape(Rail_Yards) +
+  tm_shape(MACOGSF) + tm_borders() +
+  tm_shape(railYardsMACOG) +
       tm_lines(lwd = 10, col = "black", id = "RROWNER1", popup.vars = FALSE, title.col = "Rail Yards") +
       #tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
       tm_add_legend(type = "fill", labels = "Rail Yards", col = "black") +
-  tm_shape(Blocked_Crossings) +
-      tm_dots(col = "BlockedCrossingReports", size = "BlockedCrossingReports", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title = "Blocked Crossing Reports") +
-  tm_shape(Rail_Lines) +
+  tm_shape(MACOG_xingsblockedSummary) +
+      tm_dots(col = "Count", size = "Count", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title = "Blocked Crossing Reports") +
+  tm_shape(railLinesMACOG) +
       tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(Grade_Crossings) +
+  tm_shape(MACOG_allXings) +
       tm_dots(col = "CrossingType", palette = "RdBu", alpha = 0.75, popup.vars = FALSE, size = 0.01, title = "Crossing Type")
 
 tmap_save(RailLinesBlockedXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/MACOG Blocked Crossings.html")
@@ -174,30 +167,26 @@ MACOG_xingaccs5yr %>% filter(Total5yr >1)
 
 # Joining 5-year Crossing Incident Data to FRA Crossing Inventory Data
 MACOG_RailCrossingIncidents <- MACOG_xingaccs %>%
-  inner_join(MACOG_xingaccs5yr, by = c("CrossingID" = "GXID"))
-
-MACOG_RailCrossingIncidents %>% ggplot(aes(x = YEAR)) + geom_histogram(stat = "count")
-plotly::ggplotly()
-
-MACOG_RailCrossingIncidents_shp <- MACOG_xingaccs %>%
   inner_join(MACOG_xingaccs5yr, by = c("CrossingID" = "GXID")) %>%
   left_join(MACOG_xings %>%
               mutate(long = unlist(map(MACOG_xings$geometry, 1)),
                      lat = unlist(map(MACOG_xings$geometry, 2))),
             by = "CrossingID") %>%
+  mutate(Severity = case_when(
+    Fatal > 0 ~ "Fatal",
+    TRUE ~ "Severe Injury"
+  )) %>%
   st_as_sf(coords = c("long", "lat"), crs = 4326)
 
-# Rail Incidents Map
 RailIncidents <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
-  tm_shape(Rail_Lines) +
+  tm_shape(MACOGSF) + tm_borders() +
+  tm_shape(MACOG_railLines) +
     tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(MACOG_RailCrossingIncidents_shp) +
-    tm_dots(col = "darkorange3", popup.vars = TRUE, size = 0.03) +
-  tm_shape(MACOG_RailCrossingIncidents_shp %>% filter(Fatal > 0)) +
-    tm_dots(col = "firebrick3", size = 0.05)
- 
+  tm_shape(MACOG_RailCrossingIncidents) +
+    tm_dots(col = "Severity", id = "IYR", palette = "-YlOrRd", popup.vars = FALSE)
+tmap_save(HighDailySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/HighDailySwitchingTrains.html")
+
 
 ###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ## Crossing with HIGH SWTICHING TRAIN VOLUMES and HIGH WEEKLY TRAIN VOLUMES
@@ -216,7 +205,7 @@ MACOG_xings_highSwt <- MACOG_xings %>%
 # High Switching Train Volumes Crossings Map
 HighDailySwitchingTrains <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(Rail_Lines) +
     tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xings_highSwt) +
@@ -235,7 +224,7 @@ tmap_save(HighDailySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACO
 # All Crossings according to number of switching trains per day
 AllDailySwitchingTrains <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(Rail_Lines) +
     tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xings) +
@@ -247,7 +236,7 @@ tmap_save(AllDailySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACOG
 # Note: this attribute is not available for all rail lines, hence missing info for some locations
 AllWeeklySwitchingTrains <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(Rail_Lines) +
     tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xings) +
@@ -262,13 +251,14 @@ tmap_save(AllWeeklySwitchingTrains, "C:/Users/sferzli/Documents/Projects/US/MACO
 ## Crossing in Proximity to Named Rail Yard
 # Calculate distance between grade crossing and closest rail-yard and filter by distance
 MACOG_xings_close2Yard <- MACOG_xings %>%
-  mutate(dist2Yard = as.numeric((st_distance(., MACOG_railYards[st_nearest_feature(., MACOG_railYards),], by_element = TRUE)))/1609.34) %>%
+  mutate(dist2Yard = as.numeric((st_distance(., MACOG_railYards[st_nearest_feature(., MACOG_railYards),], by_element = TRUE)))/1609.34)
+MACOG_xings_close2Yard <- MACOG_xings_close2Yard %>%
   filter(dist2Yard < quantile(MACOG_xings_close2Yard$dist2Yard, 0.10)) # 10th percentile is 0.1545027
 
 # Crossings within 10th percentile of distance to nearest yard
 ProximityToYards <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(Rail_Yards) +
     tm_lines(lwd = 10, col = "black", id = "RROWNER1", popup.vars = FALSE, title.col = "Rail Yards") +
     #tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
@@ -276,51 +266,7 @@ tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
   tm_shape(Rail_Lines) +
     tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xings_close2Yard) +
-    tm_dots(col = "darkmagenta", size = 0.01) +
-    tm_add_legend(type = "fill", labels = "Grade Crossings Close to Rail Yards", col = "darkmagenta")
-tmap_save(ProximityToYards, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/ProximityToYards.html")
-
-
-###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-## Crossing in Proximity to Closest Crossing
-# Neighbor row indices and add neighbor attribute ID's   
-data(MACOG_xings)
-sp::coordinates(MACOG_xings) = ~x+y
-
-knn1 <- knn( coordinates(MACOG_xings), coordinates(MACOG_xings), k=2)
-
-
-
-MACOG_xings@data$nnID <- MACOG_xings@data[knn1,]$IDS 
-
-
-
-
-
-
-
-
-
-
-
-
-
-MACOG_xings_close2Yard <- MACOG_xings %>%
-  mutate(dist2Yard = as.numeric((st_distance(., MACOG_railYards[st_nearest_feature(., MACOG_railYards),], by_element = TRUE)))/1609.34) %>%
-  filter(dist2Yard < quantile(MACOG_xings_close2Yard$dist2Yard, 0.10)) # 10th percentile is 0.1545027
-
-# Crossings within 10th percentile of distance to nearest yard
-ProximityToYards <-
-  tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
-  tm_shape(Rail_Yards) +
-    tm_lines(lwd = 10, col = "black", id = "RROWNER1", popup.vars = FALSE, title.col = "Rail Yards") +
-    #tm_text("YARDNAME", size = 0.8, col = "gray10", ymod = 0.5) +
-    tm_add_legend(type = "fill", labels = "Rail Yards", col = "black") +
-  tm_shape(Rail_Lines) +
-    tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
-  tm_shape(MACOG_xings_close2Yard) +
-    tm_dots(col = "darkmagenta", size = 0.01) +
+    tm_dots(col = "darkslateblue", size = 0.01) +
     tm_add_legend(type = "fill", labels = "Grade Crossings Close to Rail Yards", col = "darkmagenta")
 tmap_save(ProximityToYards, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/ProximityToYards.html")
 
@@ -330,39 +276,42 @@ tmap_save(ProximityToYards, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade 
 # Intersect for Grade Crossings on Non-Mainline Tracks
 MACOG_railLines_nonM <- MACOG_railLines %>%
   filter(NET != "M") %>%
-  st_buffer(10) %>%
-  st_cast("MULTILINESTRING")
-MACOG_xings_nonM <- st_intersection(MACOG_xings, MACOG_railLines_nonM)
+  st_buffer(5)
+MACOG_xings_nonM <-
+  st_intersection(MACOG_xings, MACOG_railLines_nonM) %>%
+  mutate(dist2Yard = NA) %>%
+  dplyr::select(colnames(MACOG_xings_close2Yard))
 
 NonMainlineXings <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(MACOG_railLines_nonM) +
-    tm_lines(lwd = 3, col = "RROWNER1", id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
+    tm_polygons(col = "RROWNER1", border.alpha = 0, id = "RROWNER1", popup.vars = FALSE, palette = "Set3", textNA = "Abandoned", title.col = "Railroad") +
   tm_shape(MACOG_xings_nonM) +
-    tm_dots(col = "darkmagenta", size = 0.01, title = "Grade Crossings on one Non-Mainline Rail")
+    tm_dots(col = "darkmagenta", size = 0.01) +
+    tm_add_legend(type = "fill", labels = "Grade Crossings on Non-Mainline", col = "darkmagenta")
 tmap_save(NonMainlineXings, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/NonMainlineXings.html")
 
+###------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+## Combine Multiple Sub-Datasets
+MACOG_xings_car <- rbind(
+  MACOG_xings_close2Yard %>% mutate(car = "Close to Rail Yard"),
+  MACOG_xings_nonM %>% mutate(car = "On Non-Mainline"))
 
-### COMPREHENSIVE GRADE CROSSINGS MAP
-
+### GRADE CROSSINGS PRIORITIZATION MAP
+Xing_Prio <-
 tm_basemap(c("CartoDB.Positron", "OpenStreetMap.Mapnik", "Esri.WorldImagery")) +
-  tm_shape(MACOG_Boundary) + tm_borders() +
+  tm_shape(MACOGSF) + tm_borders() +
   tm_shape(Blocked_Crossings) +
-    tm_dots(col = "BlockedCrossingReports", size = "BlockedCrossingReports", scale = 2, alpha = 0.5, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title = "Blocked Crossing Reports") +
-  tm_shape(MACOG_RailCrossingIncidents_shp) +
-    tm_dots(col = "darkorange3", popup.vars = TRUE, size = 0.03) +
-  tm_shape(MACOG_RailCrossingIncidents_shp %>% filter(Fatal > 0)) +
-    tm_dots(col = "firebrick3", size = 0.05) +
-  tm_shape(MACOG_xings_highSwt) +
-    tm_dots(col = "TotalSwt2", palette = "Dark2", alpha = 1, popup.vars = FALSE, size = 0.1, title = "Average Number of Switching Trains Per Day") +
-  tm_shape(MACOG_xings_nonM) +
-    tm_dots(col = "darkmagenta", size = 0.01, title = "Grade Crossings on one Non-Mainline Rail") +
-  tm_shape(MACOG_xings_close2Yard) +
-    tm_dots(col = "darkmagenta", size = 0.01) +
-    tm_add_legend(type = "fill", labels = "Grade Crossings Close to Rail Yards", col = "darkmagenta")
+    tm_dots(col = "BlockedCrossingReports", size = "BlockedCrossingReports", scale = 1, alpha = 0.3, palette = "YlOrBr", id = "Count", popup.vars = c("CrossingID", "Railroad", "CityName", "CountyName"), legend.size.show = TRUE, title = "Blocked Crossing Reports") +
+   tm_shape(MACOG_xings_highSwt) +
+    tm_dots(col = "TotalSwt2", palette = "Dark2", alpha = 1, popup.vars = FALSE, size = 0.1, title = "Switching Trains Volume") +
+  tm_shape(MACOG_RailCrossingIncidents) +
+    tm_dots(col = "Severity", id = "IYR", palette = "-YlOrRd", popup.vars = FALSE, title = "Crash Severity (5yrs)") +
+   tm_shape(MACOG_xings_car) +
+    tm_dots(col = "car", size = 0.01, palette = "GnBu", title = "")
+tmap_save(Xing_Prio, "C:/Users/sferzli/Documents/Projects/US/MACOG/Grade Crossing Analysis/Maps/Xing_Prio.html")
 
-  
 
 
 
